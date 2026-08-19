@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스마트 타이머 & 알람 앱</title>
+    <!-- Tailwind CSS (CDN) : 빠르고 간편한 스타일링을 위해 사용 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome 아이콘 (CDN) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Pretendard 폰트 적용 (깔끔한 한글 폰트) */
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Tab 버튼 활성화 스타일 transition */
+        .tab-btn {
+            transition: all 0.3s ease;
+        }
+        /* 커스텀 스크롤바 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen py-8 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-start">
+
+    <!-- 메인 컨테이너 (카드형 레이아웃) -->
+    <div class="max-w-xl w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+
+        <!-- 1. 상단 타이틀 섹션 및 안내 영역 -->
+        <div class="bg-indigo-600 text-white p-6 relative">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider bg-indigo-500 text-indigo-100 px-3 py-1 rounded-full">High School Tools</span>
+                <span id="currentTime" class="text-xs sm:text-sm bg-indigo-700 px-3 py-1 rounded-full font-mono">00:00:00 AM</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold flex items-center gap-2">
+                <i class="fa-solid font-clock text-yellow-300"></i> 타임메이트 (Timer & Alarm)
+            </h1>
+            <p class="text-indigo-200 text-xs sm:text-sm mt-1">목표 시간을 설정하고 집중력을 최상으로 유지하세요!</p>
+
+            <!-- 핵심 안내 수칙 3가지 (카드 내 상단 표시) -->
+            <div class="mt-4 bg-indigo-700/60 backdrop-blur-sm p-3 rounded-lg border border-indigo-500/50 text-xs">
+                <p class="font-bold text-yellow-300 mb-1 flex items-center gap-1">
+                    <i class="fa-solid fa-triangle-exclamation"></i> 이용 필수 핵심 규칙 3가지
+                </p>
+                <ul class="list-disc list-inside space-y-0.5 text-indigo-100">
+                    <li>입력값(시간/라벨)이 모두 채워져야 실행 가능합니다.</li>
+                    <li>알람 및 타이머 종료 시 오디오 알림이 재생됩니다.</li>
+                    <li>모든 작업 결과는 하단 기록 리스트에 즉시 저장됩니다.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 2. 탭 메뉴 (타이머 / 지정시간 알람 선택) -->
+        <div class="flex border-b border-gray-200 bg-gray-50">
+            <button id="tabTimerBtn" onclick="switchTab('timer')" class="tab-btn flex-1 py-3 text-center text-sm font-bold text-indigo-600 border-b-2 border-indigo-600 bg-white">
+                <i class="fa-solid fa-hourglass-half mr-1"></i> 카운트다운 타이머
+            </button>
+            <button id="tabAlarmBtn" onclick="switchTab('alarm')" class="tab-btn flex-1 py-3 text-center text-sm font-bold text-gray-500 hover:text-indigo-600">
+                <i class="fa-regular fa-bell mr-1"></i> 지정 시간 알람
+            </button>
+        </div>
+
+        <!-- 3. 메인 입력 폼 & 실행 영역 -->
+        <div class="p-6">
+            <!-- 에러/경고 메시지 알림창 (기본 숨김) -->
+            <div id="alertBox" class="hidden mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-xs sm:text-sm rounded flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-circle-exclamation text-red-500 text-base"></i>
+                    <span id="alertMessage">입력 항목을 확인해주세요.</span>
+                </div>
+                <button onclick="hideAlert()" class="text-red-500 hover:text-red-700 font-bold text-sm">&times;</button>
+            </div>
+
+            <!-- 라벨/목적 입력 (공통 필수 입력) -->
+            <div class="mb-4">
+                <label for="taskLabel" class="block text-xs font-bold text-gray-700 mb-1">
+                    활동 이름 / 목적 <span class="text-red-500">*</span>
+                </label>
+                <input type="text" id="taskLabel" placeholder="예: 수학 30문제 풀기, 영어 단어 암기" 
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+            </div>
+
+            <!-- [MODE 1] 카운트다운 타이머 입력 폼 -->
+            <div id="timerForm" class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">분 (Minutes)</label>
+                        <input type="number" id="timerMinutes" min="0" max="180" placeholder="0" value="10"
+                               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">초 (Seconds)</label>
+                        <input type="number" id="timerSeconds" min="0" max="59" placeholder="0" value="0"
+                               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+                <button onclick="startTimer()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm">
+                    <i class="fa-solid fa-play"></i> 타이머 시작하기
+                </button>
+            </div>
+
+            <!-- [MODE 2] 지정시간 알람 입력 폼 (기본 숨김) -->
+            <div id="alarmForm" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">알람 울릴 시간 선택 <span class="text-red-500">*</span></label>
+                    <input type="time" id="alarmTime" 
+                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <button onclick="setAlarm()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm">
+                    <i class="fa-solid fa-bell"></i> 알람 설정하기
+                </button>
+            </div>
+
+            <!-- 4. 결과 및 현황 표시 카드 영역 (상태 배지 & 하이라이트) -->
+            <div class="mt-6 border-t border-gray-100 pt-5">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">현재 진행 상황</span>
+                    <!-- 상태 배지 -->
+                    <span id="statusBadge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+                        대기 중
+                    </span>
+                </div>
+
+                <!-- Display Highlight Box -->
+                <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
+                    <p id="displayTaskName" class="text-xs text-gray-500 font-medium mb-1">설정된 작업이 없습니다</p>
+                    <div id="displayTime" class="text-4xl sm:text-5xl font-black text-gray-800 tracking-tight font-mono my-1">
+                        00:00
+                    </div>
+                    
+                    <!-- 진행도 Bar (타이머용) -->
+                    <div class="w-full bg-gray-200 rounded-full h-2 mt-3 overflow-hidden">
+                        <div id="progressBar" class="bg-indigo-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+
+                    <!-- 제어 버튼 (일시정지/취소) -->
+                    <div id="controlButtons" class="mt-4 flex justify-center gap-2 hidden">
+                        <button id="pauseBtn" onclick="togglePause()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-md transition">
+                            <i class="fa-solid fa-pause"></i> 일시정지
+                        </button>
+                        <button onclick="resetActiveTask()" class="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-md transition">
+                            <i class="fa-solid fa-stop"></i> 정지/취소
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. 이전 실행 기록 (History Storage) -->
+            <div class="mt-6 border-t border-gray-100 pt-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                        <i class="fa-solid fa-clock-rotate-left"></i> 최근 작업 기록
+                    </h3>
+                    <button onclick="clearHistory()" class="text-xs text-gray-400 hover:text-red-500 underline">기록 삭제</button>
+                </div>
+                <ul id="historyList" class="space-y-2 max-h-40 overflow-y-auto pr-1 text-xs">
+                    <li class="text-center text-gray-400 py-3">저장된 기록이 없습니다.</li>
+                </ul>
+            </div>
+
+        </div> <!-- /p-6 -->
+
+        <!-- 하단 푸터 -->
+        <div class="bg-gray-50 border-t border-gray-100 p-3 text-center text-xs text-gray-400">
+            타임메이트 © 학생 프로젝트용 모듈
+        </div>
+    </div>
+
+    <!-- JavaScript 기능 로직 -->
+    <script>
+        // --- 전역 변수 선언 ---
+        let currentTab = 'timer'; // 'timer' 또는 'alarm'
+        let timerInterval = null;
+        let alarmCheckInterval = null;
+        let totalSeconds = 0;
+        let remainingSeconds = 0;
+        let isPaused = false;
+        let activeAlarmTime = null; // HH:MM 형식 저장
+        let activeTaskTitle = "";
+
+        // 오디오 객체 (브라우저 기본 알림음 효과)
+        const alarmSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+
+        // --- 초기화 (DOM 로드시) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateCurrentClock();
+            setInterval(updateCurrentClock, 1000); // 1초마다 실시간 시계 업데이트
+            loadHistoryUI(); // 저장된 기록 불러오기
+        });
+
+        // --- 1. 실시간 시계 표시 ---
+        function updateCurrentClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour12: true });
+            document.getElementById('currentTime').innerText = timeStr;
+
+            // 알림 모드 동작 체크
+            if (activeAlarmTime && !isPaused) {
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const currentTimeStr = `${hours}:${minutes}`;
+
+                if (currentTimeStr === activeAlarmTime) {
+                    triggerAlarmFinish();
+                }
+            }
+        }
+
+        // --- 2. 탭 전환 기능 ---
+        function switchTab(mode) {
+            currentTab = mode;
+            const timerBtn = document.getElementById('tabTimerBtn');
+            const alarmBtn = document.getElementById('tabAlarmBtn');
+            const timerForm = document.getElementById('timerForm');
+            const alarmForm = document.getElementById('alarmForm');
+
+            hideAlert();
+
+            if (mode === 'timer') {
+                timerBtn.className = "tab-btn flex-1 py-3 text-center text-sm font-bold text-indigo-600 border-b-2 border-indigo-600 bg-white";
+                alarmBtn.className = "tab-btn flex-1 py-3 text-center text-sm font-bold text-gray-500 hover:text-indigo-600";
+                timerForm.classList.remove('hidden');
+                alarmForm.classList.add('hidden');
+            } else {
+                alarmBtn.className = "tab-btn flex-1 py-3 text-center text-sm font-bold text-indigo-600 border-b-2 border-indigo-600 bg-white";
+                timerBtn.className = "tab-btn flex-1 py-3 text-center text-sm font-bold text-gray-500 hover:text-indigo-600";
+                alarmForm.classList.remove('hidden');
+                timerForm.classList.add('hidden');
+            }
+        }
+
+        // --- 3. 경고 메시지 제어 ---
+        function showAlert(msg) {
+            const alertBox = document.getElementById('alertBox');
+            document.getElementById('alertMessage').innerText = msg;
+            alertBox.classList.remove('hidden');
+        }
+
+        function hideAlert() {
+            document.getElementById('alertBox').classList.add('hidden');
+        }
+
+        // --- 4. 타이머 동작 로직 ---
+        function startTimer() {
+            hideAlert();
+            const labelInput = document.getElementById('taskLabel').value.trim();
+            const minInput = parseInt(document.getElementById('timerMinutes').value) || 0;
+            const secInput = parseInt(document.getElementById('timerSeconds').value) || 0;
+
+            // [규칙 검증] 빈값 체크
+            if (!labelInput) {
+                showAlert("활동 이름/목적을 입력해주세요!");
+                return;
+            }
+            if (minInput === 0 && secInput === 0) {
+                showAlert("타이머 시간을 1초 이상 설정해주세요!");
+                return;
+            }
+
+            resetActiveTask(); // 기존 작업 초기화
+
+            activeTaskTitle = labelInput;
+            totalSeconds = (minInput * 60) + secInput;
+            remainingSeconds = totalSeconds;
+            isPaused = false;
+
+            // UI 상태 업데이트
+            updateStatusBadge('running', '타이머 작동 중');
+            document.getElementById('displayTaskName').innerText = `[타이머] ${activeTaskTitle}`;
+            document.getElementById('controlButtons').classList.remove('hidden');
+            
+            updateTimerDisplay();
+
+            // 타이머 인터벌 실행
+            timerInterval = setInterval(() => {
+                if (!isPaused) {
+                    remainingSeconds--;
+                    updateTimerDisplay();
+
+                    if (remainingSeconds <= 0) {
+                        triggerTimerFinish();
+                    }
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const m = Math.floor(remainingSeconds / 60);
+            const s = remainingSeconds % 60;
+            const timeFormatted = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            document.getElementById('displayTime').innerText = timeFormatted;
+
+            // 프로그레스 바 계산
+            const percentage = ((totalSeconds - remainingSeconds) / totalSeconds) * 100;
+            document.getElementById('progressBar').style.width = `${percentage}%`;
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            const pauseBtn = document.getElementById('pauseBtn');
+            if (isPaused) {
+                pauseBtn.innerHTML = `<i class="fa-solid fa-play"></i> 재개`;
+                updateStatusBadge('paused', '일시 정지됨');
+            } else {
+                pauseBtn.innerHTML = `<i class="fa-solid fa-pause"></i> 일시정지`;
+                updateStatusBadge('running', '작동 중');
+            }
+        }
+
+        function triggerTimerFinish() {
+            clearInterval(timerInterval);
+            alarmSound.play();
+            updateStatusBadge('completed', '완료됨');
+            document.getElementById('progressBar').style.width = `100%`;
+            
+            // 기록 저장
+            saveHistory(activeTaskTitle, '카운트다운 타이머', '완료');
+            alert(`⏰ [${activeTaskTitle}] 타이머 시간이 종료되었습니다!`);
+            resetActiveTaskUI();
+        }
+
+        // --- 5. 알람 동작 로직 ---
+        function setAlarm() {
+            hideAlert();
+            const labelInput = document.getElementById('taskLabel').value.trim();
+            const alarmTimeInput = document.getElementById('alarmTime').value;
+
+            // [규칙 검증] 빈값 체크
+            if (!labelInput) {
+                showAlert("활동 이름/목적을 입력해주세요!");
+                return;
+            }
+            if (!alarmTimeInput) {
+                showAlert("울릴 알람 시간을 선택해주세요!");
+                return;
+            }
+
+            resetActiveTask();
+
+            activeTaskTitle = labelInput;
+            activeAlarmTime = alarmTimeInput;
+
+            // UI 상태 업데이트
+            updateStatusBadge('running', '알람 대기 중');
+            document.getElementById('displayTaskName').innerText = `[알람] ${activeTaskTitle}`;
+            document.getElementById('displayTime').innerText = activeAlarmTime;
+            document.getElementById('progressBar').style.width = `100%`;
+            document.getElementById('controlButtons').classList.remove('hidden');
+            document.getElementById('pauseBtn').classList.add('hidden'); // 알람은 일시정지 미지원
+        }
+
+        function triggerAlarmFinish() {
+            alarmSound.play();
+            updateStatusBadge('completed', '알람 울림');
+            
+            // 기록 저장
+            saveHistory(activeTaskTitle, `알람 (${activeAlarmTime})`, '완료');
+            
+            const task = activeTaskTitle;
+            resetActiveTask();
+            alert(`🔔 [${task}] 설정한 알람 시간이 되었습니다!`);
+        }
+
+        // --- 6. 공통 리셋 & 상태 변경 ---
+        function resetActiveTask() {
+            if (timerInterval) clearInterval(timerInterval);
+            activeAlarmTime = null;
+            isPaused = false;
+            resetActiveTaskUI();
+        }
+
+        function resetActiveTaskUI() {
+            document.getElementById('controlButtons').classList.add('hidden');
+            document.getElementById('pauseBtn').classList.remove('hidden');
+            document.getElementById('pauseBtn').innerHTML = `<i class="fa-solid fa-pause"></i> 일시정지`;
+            updateStatusBadge('idle', '대기 중');
+        }
+
+        function updateStatusBadge(type, text) {
+            const badge = document.getElementById('statusBadge');
+            badge.innerText = text;
+
+            // 타입별 배지 컬러 조합
+            if (type === 'running') {
+                badge.className = "px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 animate-pulse";
+            } else if (type === 'paused') {
+                badge.className = "px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700";
+            } else if (type === 'completed') {
+                badge.className = "px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700";
+            } else {
+                badge.className = "px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600";
+            }
+        }
+
+        // --- 7. 이전 기록 (LocalStorage) 관리 ---
+        function saveHistory(title, mode, result) {
+            const history = JSON.parse(localStorage.getItem('tm_history') || '[]');
+            const now = new Date();
+            const timeStr = `${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            
+            history.unshift({
+                id: Date.now(),
+                title: title,
+                mode: mode,
+                time: timeStr,
+                result: result
+            });
+
+            // 최대 10개만 유지
+            if (history.length > 10) history.pop();
+
+            localStorage.setItem('tm_history', JSON.stringify(history));
+            loadHistoryUI();
+        }
+
+        function loadHistoryUI() {
+            const history = JSON.parse(localStorage.getItem('tm_history') || '[]');
+            const listEl = document.getElementById('historyList');
+
+            if (history.length === 0) {
+                listEl.innerHTML = `<li class="text-center text-gray-400 py-3">저장된 기록이 없습니다.</li>`;
+                return;
+            }
+
+            listEl.innerHTML = history.map(item => `
+                <li class="bg-gray-50 border border-gray-100 p-2.5 rounded-lg flex justify-between items-center">
+                    <div>
+                        <span class="font-bold text-gray-800">${escapeHtml(item.title)}</span>
+                        <span class="text-[10px] text-gray-400 ml-1">(${item.mode})</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] text-gray-400">${item.time}</span>
+                        <span class="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[10px] font-bold">${item.result}</span>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        function clearHistory() {
+            if (confirm("모든 저장 기록을 삭제하시겠습니까?")) {
+                localStorage.removeItem('tm_history');
+                loadHistoryUI();
+            }
+        }
+
+        // XSS 방지용 간단 에스케이프 함수
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+    </script>
+</body>
+</html>
